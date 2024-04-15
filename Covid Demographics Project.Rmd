@@ -17,6 +17,7 @@ library(broman)
 library(dplyr) 
 ```
 
+<<<<<<< HEAD
 ## Reading the Data
 
 ```{r}
@@ -24,6 +25,8 @@ covid <- read_csv("all-states-history.csv", show_col_types = FALSE)
 demographics <- read_csv("sc-est2022-alldata5.csv")
 ```
 
+=======
+>>>>>>> e7cd790f138858a58e761d8af6deb420aee27ebc
 ## R Markdown
 
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
