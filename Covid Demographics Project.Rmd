@@ -17,32 +17,29 @@ library(broman)
 library(dplyr) 
 ```
 
-<<<<<<< HEAD
-## Reading the Data
-
-```{r}
+```{r include=FALSE}
 covid <- read_csv("all-states-history.csv", show_col_types = FALSE)
 demographics <- read_csv("sc-est2022-alldata5.csv")
 ```
 
-=======
->>>>>>> e7cd790f138858a58e761d8af6deb420aee27ebc
-## R Markdown
+# Introduction
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+The opening sentence or sentences should draw the reader into your report by providing high-level motivation for the analysis. Describe the question or questions of interest and the motivation for the analysis. Conclude the introduction with a thesis statement. A thesis statement comprises one or two declarative sentences that summarize the main point of the report and clearly makes an assertion and communicates to the reader the position the authors have taken on the topic.1Links to an external site.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Background
 
-```{r cars}
-summary(cars)
-```
+Describe the data set, how it was collected, what the variables mean. Cite the source of your data. Describe any background information needed to better comprehend the question or questions you are posing and how the data relate to the question. Describe any unusual factors which may affect interpretation of results. Describe what you intend to do in the rest of the report.
 
-## Including Plots
+# Analysis
 
-You can also embed plots, for example:
+Include numerical and graphical summaries of the data. Be sure to introduce and describe your numerical and graphical summaries. Do not display a series of summaries without text explaining them. Make sure to include at least one graphical display of the data that best supports your main conclusions for your primary question, and explain how it supports your conclusions. For each inference you make, briefly describe the method you use and what the results are. Provide evidence to support each of your claims. This section should not include substantial interpretation of results. Leave that for the discussion.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
+# Discussion
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Provide broader interpretations of your analysis and describe how to interpret your results with respect to your question of interest. Discuss any potential short-comings of the analysis. Discuss potential future directions for additional work New questions Different methods to address the same questions New data you might collect to refine your understanding Summarize your primary conclusions and the primary evidence that supports these conclusions.
+
+# References
+
+In the R Markdown file, you may automatically cite other resources by using a caret followed by the reference between square brackets: [^1] which will place a marker at this location and a footnote at the end of the document.
+
+[^1]: your reference text
