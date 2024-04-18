@@ -1,15 +1,18 @@
 ---
-title: "GoalsDataSet"
+title: "Proportion Inference on World Cup Penalties"
 output: html_document
 date: "2024-04-15"
+author: "Bala Shukla, Abby Hanson, Saksham Nirvan, Arushi Dodhia"
 ---
 
 ```{r setup, include=FALSE}
+# Loading up necessary libraries and setting up the project
 knitr::opts_chunk$set(echo = TRUE)
 #Uncomment if need to install
 #install.packages('tidyverse') 
 #install.packages('ggplot') 
 #install.packages('dplyr') 
+#install.packages('gt') 
 library(tidyverse)
 library(lubridate)
 library(kableExtra)
@@ -17,27 +20,426 @@ library(broman)
 library(dplyr) 
 ```
 
-```{r include=FALSE}
-goals <- read_csv("WorldCupShootouts.csv", show_col_types = FALSE)
+# Introduction
 
-goalstemp <- goals %>% 
-  group_by(Zone) %>% 
-  summarize(numGoals = sum(Goal), Attempts = n()) %>% 
-  filter(Zone != c(4, 5, 6))
+Penalty kicks are an important phase of a soccer game, in-fact Fifa Men’s World cups from 1994, 2006 and 2022 were all ultimately decided by a penalty shootout. ^[https://www.besoccer.com/new/how-many-world-cup-finals-have-been-determined-via-a-penalty-shootout-1214192] Inductively, it seems beneficial for Teams, Fans and Data Science students to have analysis of penalty kick data. Benefits range from statistical insights on which zones to shoot in, as well as being a tool when looking at goalkeeping behavior. With this information at hand, teams and players can gain an advantage over their opponents in future penalty shootouts. This project focused on checking if proportions and differences between them in a sample of penalty kicks are indicative or models of the true underlying proportion. More specifically we looked at: **Are the proportions of goals from shots taken from different regions equal or different in FIFA World Cup penalty shoot outs from 1982 to 2018? Also, what is the true proportion of the goalkeeper not diving in penalty shootouts taken in FIFA World Cups from 1982 to 2018?**
+
+# Background
+
+This data set is of every single penalty kick in the World Cup from 1982 to Russia 2018. It is from a Kaggle dataset ^[<https://www.kaggle.com/datasets/pablollanderos33/world-cup-penalty-shootouts?resource=download>] written by Pablo Landeros. Pablo built the data set by watching every single penalty kick in a World Cup Shootout from Spain 1982 to Russia 2018. We intend to calculate whether or not the proportions of goals from shots taken at the top of the goal and bottom of the goal are equal and whether the true proportion of the goalkeeper not diving in penalty shootouts taken in FIFA World Cups from 1982 to 2018 is 0.33. Furthermore, we will calculate whether shooting at middle has lower proportion of goals compared to shooting at the edges. 
+
+Note for background, the data should be independent for a skilled goalkeeper who isn’t affected by psychological cues from the kicker’s previous kicks.
+
+Game_id: Number used to identify the game where a penalty shootout occured in the world cup in chronological order(1 being the oldest game, 30 being the most recent)
+
+Team: Country participating in the penalty shootout
+
+Zone: The integer value of which zone the kicker is kicking from (zone 1-9)
+
+1 - Top Left, 2 - Top Center, 3 - Top Right
+
+4 - Middle Left, 5 - Middle Center, 6 - Middle Right,
+
+7 - Bottom Left, 8 - Bottom Center, 9 - Bottom Right
+
+Foot: The foot the penalty kicker used to shot (L = Left, R = Right)
+
+Keeper: The direction the keeper dived (L = left, C = Center, R = Right)
+
+OnTarget: Whether the penalty was on target in respective to the goal frame (1 = yes, 0 = no)
+
+Goal: Whether the penalty kick resulted in a goal (1 = yes, 0 = no)
+
+Penalty_Number: The kicker's position in the shootout's kicking order
+
+Elimination: Whether or not the penalty was for elimination. This where the cases when, if the shot went in, the Game was over or the cases where a miss would end the game. (1 = yes, 0 = no)
+
+Throughout this project we look at the percentage of scoring a goal based on the position of the kicker (which zone) and whether or not the goalie is diving (disregaring the direction of the dive). We create a table to calculate the number of goals in the first interval and we use the hypothesis p-test to answer the question. To analyze the proportion of the goalkeeper diving or not we use a confidence interval using the calculated point estimate and the standard error.
+
+Previous kicks from this sample do not affect future kicks.
+
+This project assumes that the goalie is diving independent of previous assumtions about the kicker, the crowd does not affect either the kicker or the goalie, and there are no previous stress or other factors affecting the goalie or kicker.
+
+An unusual feature of the data is that there are two occurances of a lowercase L instead of uppercase L in the Keeper collumn. In order to resolve this issue, when mutating the data together by Keeper we converted the column to contain only capital letters using the toupper() method.
+
+# Analysis
+
+```{r, include=FALSE}
+goals <- read_csv("WorldCupShootouts.csv", show_col_types = FALSE) 
+zone_analysis <- goals %>% drop_na(Zone)
 ```
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+### Zone Analysis:
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+Lets begin by looking at some data about the Goals. Recall there were 9 zones in total, starting with 1 at the top left and ending with 9 at the bottom right.
 
-```{r cars}
+The following table displays the number of goals scorred, kicks attempted, and percentage of kicks scored per zone.
+
+
+
+```{r, echo=FALSE}
+zone <- zone_analysis %>% group_by(Zone) %>% 
+  summarise(
+    Number_of_Goals = sum(Goal),
+    Attempts = n(),
+    Pct_Goals = Number_of_Goals/Attempts
+  )
+zone
 ```
 
-## Including Plots
+The bar graph below takes the Pct_Goals collumn from the table about and graphs it by zone.
 
-You can also embed plots, for example:
+```{r, echo = FALSE}
+plot <- ggplot(zone, aes(x = factor(Zone), y = Pct_Goals, fill = factor(Zone))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Zone", y = "Percentage of Goals", title = "Percentage of Goals vs Zones They Were Aimed At")
+print(plot)
+```
+From this we see that the percentage of goals was lower when aiming for the for the horizontally middle zones (2, 5 and 8). Additionally, by looking at the zones vertically, we suspect that the zones near the top may have a higher percentage of goals then at the bottom. But we cannot say this clearly from this graph, alone.
 
-```{r pressure, echo=FALSE}
+Lets start with Top and Bottom
+
+#### Difference in Proportions: Bottom vs Top Zones
+
+```{r, echo=FALSE}
+
+table_top_center_bottom <- zone_analysis %>%
+  mutate(Zone_Group = case_when(
+  Zone %in% c(1, 2, 3) ~ "top",
+  Zone %in% c(4, 5, 6) ~ "center",
+  Zone %in% c(7, 8, 9) ~ "bottom"
+  )) %>%
+  group_by(Zone_Group) %>% 
+  summarise(
+    numGoals = sum(Goal),
+    Attempts = n(),
+    prop = numGoals/Attempts
+  )
+
+table_top_center_bottom
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+This is the summary table for the vertically top, center, bottom. We are interested in looking at just if the region at the top has a significant percentage difference of goals than the bottom. So graph just those two.
+
+```{r, echo = FALSE}
+plot <- ggplot(table_top_center_bottom %>% filter(Zone_Group != "center"), aes(x = factor(Zone_Group), y = prop, fill = factor(Zone_Group))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Horizontal Region", y = "Percentage of Goals", title = "Percentage of Goals vs Horizontal Regions They Were Aimed At")
+print(plot)
+```
+
+We observe the chance of scoring a penalty in a penalty shootout when aimed at the top of the goal to be 6.34% higher than scoring a penalty in a penalty shootout when aimed at the bottom of the goal.
+
+Now we ask, are the proportions of goals from shots taken at the bottom of the goal and at the top of the goal equal or different in FIFA World Cup penalty shootouts from 1982 to 2018?
+
+##### Statistical Model
+
+$p_1$ is the probability of scoring a penalty during shoot out when shooting at the top of the goal
+
+$p_2$ is the probability of scoring a penalty during shoot out when shooting at the bottom of the goal
+
+$X_1$ - Binomial(63, $p_1$)
+
+$X_2$ - Binomial(129, $p_2$)
+
+##### Hypothesis
+
+$H_0: p_1 = p_2$
+
+$H_a: p_1 \neq p_2$
+
+-   The null hypothesis is there is no difference in the probability of scoring from a penalty kick shot at the top of the goal compared to the bottom of the goal
+
+-   The alternative hypothesis is that there is a difference
+
+##### Calculate a Test Statistic
+
+-   The most direct test statistic we may select is the difference in sample proportions, p̂1−p̂2.
+
+-   If the null hypothesis is true, we expect this statistic to be close to zero with differences caused by random sampling variation
+
+-   If the null hypothesis is false, then we expect this statistic to be different from zero
+
+##### Determining the null sampling distribution of the test statistic
+
+-   To estimate p from the data, we combine both samples (shots at the top of the goal & shots at the bottom of the goal):
+
+$\bar{p} = \frac{X_1 + X_2}{n_1 + n_2} = \frac{46 + 86}{63 + 129} \doteq 0.6875$
+
+##### **Normal approximation for p-value**
+
+${\text{SE}(\hat{p}_1 - \hat{p}_2) = \sqrt{ \frac{p_1(1-p_1)}{n_1} + \frac{p_2(1-p_2)}{n_2} }}$
+
+-   Use the common estimate p¯=0.6875 for both p1 and p2.
+
+-   Use the standardization formula
+
+    $z = \frac{(\hat{p}_1 - \hat{p}_2) - 0}{\text{SE}}$
+
+-   Find the p-value with an area under the curve.
+
+Common estimate p:
+
+```{r, echo=FALSE}
+shootoutZones = zone_analysis %>% 
+  select(Zone, Goal) %>% 
+  filter(!Zone %in% c(4,5,6)) %>% 
+    drop_na() %>% 
+  mutate(Zone_group = case_when(
+    Zone %in% c(1,2,3) ~ "Top",
+    Zone %in% c(7,8,9) ~ "Bottom"
+  )) %>% 
+  group_by(Zone_group) %>% 
+  summarize(
+    Goals = sum(Goal),
+    Attempts = n()) %>% 
+  mutate(prop = Goals/Attempts)
+
+n1 = shootoutZones %>% filter(Zone_group == "Bottom") %>% pull(Attempts)
+n2 = shootoutZones %>% filter(Zone_group == "Top") %>% pull(Attempts)
+x1 = shootoutZones %>% filter(Zone_group == "Bottom") %>% pull(Goals)
+x2 = shootoutZones %>% filter(Zone_group == "Top") %>% pull(Goals)
+
+test_stat = (x1/n1) - (x2/n2)
+p0 = (x1 + x2)/(n1 + n2)
+p0
+```
+
+Z-Score (Standard Score):
+
+```{r, echo = FALSE}
+se = sqrt( p0*(1-p0)/n1 + p0*(1-p0)/n2 )
+z = test_stat / se
+z
+
+```
+
+p-value:
+
+```{r, echo = FALSE}
+pvalue_z = 2*pnorm(-abs(z))
+pvalue_z
+```
+
+##### Difference in Proportions: Horizontal Middle vs Edges
+
+Now lets look at our other observation. Recall when looking at the zones the zones that were horizontally in the middle: 2, 5, 8, appeared to have a lower percentage of goals than the other zones.
+
+We now want to compare the middle goal to the horizontal edges.
+
+```{r, echo = FALSE}
+table_left_center_right <- zone_analysis %>%
+  mutate(Zone_Group = case_when(
+  Zone %in% c(1, 4, 7) ~ "left",
+  Zone %in% c(2, 5, 8) ~ "middle",
+  Zone %in% c(3, 6, 9) ~ "right"
+  )) %>%
+  group_by(Zone_Group) %>% 
+  summarise(
+    numGoals = sum(Goal),
+    Attempts = n(),
+    prop = numGoals/Attempts
+  )
+
+```
+
+Lets combine the left and right as edges, and visualize this data as a table and a graph.
+
+```{r, echo=FALSE}
+table_edges_middle <- zone_analysis %>%
+  mutate(Zone_Group = case_when(
+  Zone %in% c(1, 4, 7, 3, 6, 9) ~ "edges",
+  Zone %in% c(2, 5, 8) ~ "middle"
+  )) %>%
+  group_by(Zone_Group) %>% 
+  summarise(
+    numGoals = sum(Goal),
+    Attempts = n(),
+    prop = numGoals/Attempts
+  )
+
+table_edges_middle
+plot <- ggplot(table_edges_middle, aes(x = factor(Zone_Group), y = prop, fill = factor(Zone_Group))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Horizontal Region", y = "Percentage of Goals", title = "Percentage of Goals vs Horizontal Regions They Were Aimed At")
+print(plot)
+```
+
+Now we want to see if there is indeed a lower true proportion of goals landing when. shot in the middle compared to the edges.
+
+##### Statistical Model
+
+We use
+
+$X \mid p \sim \text{Binomial}(57,p)$
+
+where p is the true proportion of goals scored when shooting in the middle
+
+##### Hypothesis
+
+$H_0: p >= 0.725$
+
+$H_a: p < 0.725$
+
+-   The null hypothesis is that the true proportion of scoring in the middle is greater than or equal to at the edges.
+
+-   The alternative hypothesis is that it is more unlikely to score in the middle when compared to the edges.
+
+We use a CDF (pbinom) to find that if given a p is 0.725, if we have 57 trials, what is the probability that less than 34 of them will be goals (success)).
+
+p-value:
+```{r, echo = FALSE}
+#pbinom(34 - 1 ,57,0.725)
+print(pbinom(34 - 1 ,57,0.725))
+```
+
+### Dive Analysis:
+
+A goalies' decision to dive plays a major role, in whether a goal is made or not. Another important fact to analyze is the true proportion of times a Goalkeeper does not dive. For this we will consider both diving to the left and diving to the right as just diving, and staying in the center as staying. Essentially, we are looking for the true proportion for the goalie not leaving his position.
+
+```{r, echo = FALSE}
+dive_analysis <- goals %>% 
+  drop_na(Keeper) %>% 
+  mutate(Keeper = toupper(Keeper)) 
+```
+
+```{r, echo = FALSE}
+# What is the true proportion of the goalkeeper not diving in penalty shootouts taken in FIFA World Cups from 1982 to 2018?
+
+# Confidence Interval for Diving
+# n = sum of dives and not dives
+# x = did not dive
+
+dive_summary_1 <- dive_analysis %>%
+  group_by(Keeper) %>% 
+  summarize(
+    Attemps = n()
+  )
+dive_summary_1
+```
+
+We will consider both the Dives to the L and R and just "Dive" and staying in the center as "Did Not".
+
+```{r, echo = FALSE}
+# we can then do a confidence interval to find wiht 95% confidence what the true proportion of a goalee diving is!
+dive_summary_2 <- dive_analysis %>%
+  drop_na() %>% 
+  mutate(Keeper = toupper(Keeper)) %>% 
+  mutate(Keeper = case_when(
+    Keeper == "C" ~ "did not ",
+    Keeper %in% c("R", "L") ~ "dive"
+  )) %>%
+  group_by(Keeper) %>%
+  summarize(
+    Attempts = n()
+  )
+dive_summary_2
+
+cat("Here is a quick graph visualizing this: ")
+plot <- ggplot(dive_summary_2, aes(x = Keeper, y = Attempts)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(x = "Dive", y = "Number of Times", title = "Did the Goalie Dive?")
+print(plot)
+
+```
+
+**Statistical Analysis:**
+
+To estimate the true proportion of times goalkeepers did not dive, we use the Agresti-Coull method, which is suitable for binomial proportions and provides a confidence interval:
+
+-   **Total Penalties (Sample Size)**: 279 (243 dives + 36 non-dives)
+
+-   **Non Dives**: 36
+
+-   **Point Estimate** $\tilde{p}$ from AC Method: (36 + 2) / (279 + 4) ≈ 0.134
+
+-   **Confidence Interval:** 95%
+
+```{R, echo = FALSE}
+
+x <- 36
+n <- 36 + 243
+
+
+binom_se = function(n, p){
+  return ( sqrt( p*(1-p)/n) )
+}
+
+binom_ci = function(est, se, conf=0.95){
+  z = qnorm(1 - (1 - conf)/2)
+  me = z * se
+  ci = est + c(-1,1)*me
+  return(ci)
+}
+
+p_tilde = (x+2)/(n+4)
+se = binom_se(n+4, p_tilde)
+ci = binom_ci(p_tilde, se, .95)
+```
+
+${SE}(\tilde{p}) = \sqrt{ \frac{\tilde{p}(1-\tilde{p})}{n + 4} }$
+
+SE =
+
+```{r, echo = FALSE}
+se
+```
+
+Resulting Confidence Interval for the Agresti-Coull method:
+
+```{r, echo = FALSE}
+ci
+```
+
+# Discussion
+
+### Zone Discussion:
+
+##### Shooting Top vs Bottom
+
+When we completed our hypothesis test for a difference in proportion between goals when shooting at the top vs the bottom of the goal, we ended with a p-value of 0.37.
+
+There is no evidence that shooting at the top of the goal during a penalty shootout results in a higher probability of scoring compared to shooting at the bottom of the goal (p=0.37, z-test for difference in proportions). Since we couldn't reject the null hypothesis, based on the p-value we can get data as extreme or more extreme as the variation in the goal rate between shooting at the top or bottom of the goal during a shootout 37% of the time.
+
+##### Shooting Top vs Bottom
+
+When we completed our hypothesis test for difference in proportion between goals when shooting at the top vs the bottom of the goal, we ended with a p-value of 0.37.
+
+### Dive Discussion:
+
+Recall we got about 0.095 and 0.174 by for our Confidence Interval Via Agresti-Coull method. This leads us to the answer of the our Second Inference Question:
+
+> We are 95% confident that the true proportion of the times a Goalkeeper would not dive is between 0.095 and 0.174 of the time.
+
+In other words, if p is the true proportion of times a Goalie does not dive, it must be between: 0.095 and 0.174 times with a 95% confidence level.
+
+### Potential Shortcomings
+
+Our Data was limited in size to just the penalties from just the FIFA World Cups; including data from places like Club Soccer Matches (i.e UEFA, Premier League) and other high ranking soccer events may be beneficial. The Data was also based off of a single person's archival study of past soccer games, this means that there may have been room for errors in recording the observations.
+
+Another Shortcoming that is the debatebility of the independence of our samples, in any analysis when we make assumptions about the normality of the data we assume the data is independent. But one could argue that the goalie and the kicker's decisions may be influenced by stress or other psychological cues from previous shootout attempts **in that game**. Most of the pentalty kicks we observed happened in different games.
+
+\- For example, if a previous kick may have been a goal and goalie did not dive, the goalie may be begin subconsciously doubting his decision making for not diving and consequently may begin to dive more. Ideally, a competent goalie will not let this affect him and may try to access each penalty kick independently, but nevertheless this is a concern in our analysis.
+
+### Future Study
+
+Discuss potential future directions for additional work
+
+-   New questions
+
+There are a lot of Additional Questions that be posed One thing that could be interesting is to see if shooting in the corner Zones, 1, 3, 7 and 9 has a statistically higher proportion of goals than the other zones.
+
+-   Different methods to address the same questions
+
+We could also make use of confidence intervals to look at the Zone Analysis. For example, we could check with 95% confidence how much certain regions' proportions were higher than other regions.
+
+-   New data you might collect to refine your understanding We could add data from Club Soccer Games and other Leagues on top of the FIFA data.
+
+Like previously mentioned, collecting additional data about penalty kicks might be more insightful.
+
+-   Summarize your primary conclusions and the primary evidence that supports these conclusions.
+
+# References
